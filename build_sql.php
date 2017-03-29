@@ -44,3 +44,35 @@ echo '<hr />';
 echo tsql("vfm la gi ?");
 echo '<hr />';
 echo tsql("fob là gì ?");
+exit;
+function b($m) {
+	return '[bot '.$m[1].']';
+}
+function s($m) {
+	return '[star '.$m[1].']';
+}
+function se($m) {
+	return '[set '.$m[1].']';
+}
+function hh($m) {
+	return '<template>'.htmlspecialchars($m[1]).'</template>';
+}
+$str = file_get_contents('AI.aiml');
+$str = str_replace('<br/>',"\n", $str);
+$str = str_replace('<srai>',"[srai]", $str);
+$str = str_replace('<think>',"[think]", $str);
+$str = str_replace('</srai>',"[/srai]", $str);
+$str = str_replace('</set>',"[/set]", $str);
+$str = str_replace('</think>',"[/think]", $str);
+$str = str_replace('<li>',"[li]", $str);
+$str = str_replace('</li>',"[/li]", $str);
+$str = preg_replace_callback('/<bot (.*?)\/>/',"b", $str);
+$str = preg_replace_callback('/<star (.*?)\/>/',"s", $str);
+$str = preg_replace_callback('/<set (.*?)>/',"se", $str);
+
+$str = preg_replace_callback('/(?s)<template>(.*?)<\/template>/','hh', $str);
+
+
+$xml = simplexml_load_string($str);
+
+print_r($xml);
