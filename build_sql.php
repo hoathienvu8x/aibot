@@ -37,6 +37,68 @@ function tsql($message) {
 		return "select * from aiml where ".implode(' or ', $likes);
 	}
 }
+
+function b($m) {
+	return '[bot '.$m[1].']';
+}
+function s($m) {
+	return '[star '.$m[1].']';
+}
+function se($m) {
+	return '[set '.$m[1].']';
+}
+function hh($m) {
+	return '<template>'.htmlspecialchars($m[1]).'</template>';
+}
+$str = file_get_contents('AI.aiml');
+$str = str_replace('<br/>',"\n", $str);
+$str = str_replace('<srai>',"[srai]", $str);
+$str = str_replace('<think>',"[think]", $str);
+$str = str_replace('</srai>',"[/srai]", $str);
+$str = str_replace('</set>',"[/set]", $str);
+$str = str_replace('</think>',"[/think]", $str);
+$str = str_replace('<star/>',"[star]", $str);
+// $str = str_replace('<li>',"[li]", $str);
+// $str = str_replace('</li>',"[/li]", $str);
+$str = preg_replace_callback('/<bot (.*?)\/>/',"b", $str);
+$str = preg_replace_callback('/<star (.*?)\/>/',"s", $str);
+$str = preg_replace_callback('/<set (.*?)>/',"se", $str);
+$str = preg_replace('/ {2,}/',' ',$str);
+
+$sql = "";
+header('Content-Type:text/plain;charset=utf-8');
+$xml = simplexml_load_string($str);
+$id = 1;
+foreach($xml->category as $cat) {
+	// print_r($cat);
+	$sql .= "insert into aiml (id, category, pattern, template) values ($id, 1, '".$cat->pattern."','".(($cat->template->random) ? '' : str_replace(array("\n","'"),array('\n',"\'"),trim((string)$cat->template)))."');\n";
+	// echo '<i>'.$cat->pattern.'</i><br />';
+	if ($cat->template->random) {
+		foreach($cat->template->random->li as $a) {
+			str_replace(array("\n","'"),array('\n',"\'"),(string)$a);
+			$sql .= "insert into ramdoms (aiml, template) values ($id, '$a');\n";
+			// echo '<strong style="color:red;">'.$a.'</strong><br />';
+		}
+	} else {
+		// echo '<strong style="color:green;">'.htmlspecialchars($cat->template).'</strong><br />';
+	}
+	$id++;
+}
+echo trim($sql);
+
+// print_r($xml);
+
+exit;
+function _x($m) {
+	return '<bot '.$m[1].'/>';
+}
+
+$pattern = '[bot name="name"] owes much to the pioneering work of Weizenbaum on ELIZA, but [bot name="name"] contains far more knowledge.';
+$x = preg_replace_callback('/\[bot (.*?)\]/','_x',$pattern);
+echo $x;
+
+exit;
+
 echo tsql("hello");
 echo '<hr />';
 echo tsql("hello foo");
