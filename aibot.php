@@ -1,6 +1,6 @@
 <?php
 require_once dirname(__FILE__) . '/database.php';
-
+define('IS_MB_ENABLED', true);
 class AIBot {
 	private static $instance = null;
 	private static $db = null;
@@ -41,26 +41,83 @@ class AIBot {
 	public function getSession() {
 		return $this->session;
 	}
-	// Private
-	private function getAnswer($message) {
+	private function _strtolower($text) {
+		return (IS_MB_ENABLED) ? mb_strtolower($text) : strtolower($text);
+	}
+	private function _strtoupper($text) {
+		return (IS_MB_ENABLED) ? mb_strtoupper($text) : strtoupper($text);
+	}
+	private function match_pattern($pattern, $input) {
+		if (empty($input)) {
+			return false;
+		}
+		$pattern_regex = $this->pattern_regex($this->_strtolower($pattern));
+		return preg_match($pattern_regex, _strtolower($input)) === 1;
+	}
+	private function pattern_regex($item) {
+		$item = trim($item);
+		$item = str_replace("*", ")(.*)(", $item);
+		$item = str_replace("_", ")(.*)(", $item);
+		$item = str_replace("+", "\+", $item);
+		$item = "(" . str_replace(" ", "\s", $item) . ")";
+		$item = str_replace("()", '', $item);
+		$matchme = "/^" . $item . "$/ui";
+		return $matchme;
+	}
+	private function aiml_like_query($message) {
+		$words = explode(' ', $message);
+		if (count($words) == 1) {
+			return "select * from aiml where pattern like '%$message%'";
+		}
+		$totalWords = count($words);
+		$count_words = $totalWords - 1;
+		$first_word = $words[0];
+		$last_word = $words[$count_words];
+		$likes = array(
+			"pattern like '$first_word % $last_word'",
+			"pattern like '$first_word %'"
+		);
+		for($i = 0; $i < $totalWords; $i++) {
+			$twoUp = $i + 2;
+			$oneUp = $i + 1;
+			$oneDown = $i - 1;
+			
+			if (isset($words[$twoUp])) {
+				$middleWord = $words[$oneUp];
+				$likes[] = "(pattern like '% $middleWord %')";
+			}
+			if ($oneDown >= 0) {
+				$likePatternOneArr = $words;
+				$likePatternOneArr[$i] = '%';
+				$likePatternOne = implode(' ', $likePatternOneArr);
+				$likes[] = "(pattern like '".trim(strstr($likePatternOne, '%', true))." %')";
+			}
+			if ($oneUp < $totalWords) {
+				$likePatternOneArr = $words;
+				$likePatternOneArr[$i] = '%';
+				$likePatternOne = implode(' ', $likePatternOneArr);
+				$likes[] = "(pattern like '" . trim(strstr($likePatternOne, '%', false)) . "')";
+			}
+		}
+		return "select * from aiml where ".implode(' or ', $likes);
+	}
+	private function getResultPatterns($message) {
 		$result = self::$db->once_fetch_array("select * from aiml where pattern like '$message'");
 		if ($result) {
-			return $this->processMessage($result);
+			return $result;
 		}
-		$words = explode(' ', $message);
-		$total = count($words);
-		$msg = '';
-		$result = null;
-		$i = 0;
-		do {
-			if ($i >= $total) {
-				$this->addUnknown($this->input);
-				break;
+		$sql = $this->aiml_like_query($message);
+		$query = self::$db->query($sql);
+		while ($row = self::$db->fetch_array($query)) {
+			if ($this->match_pattern($row['pattern'], $message)) {
+				return $row;
 			}
-			$msg .= $words[$i] . ' ';
-			$result = self::$db->once_fetch_array("select * from aiml where pattern like '$msg'");
-			$i++;
-		} while (!$result);
+		}
+		return null;
+	}
+	// Private
+	private function getAnswer($message) {
+		$result = $this->getResultPatterns($message);
 		
 		if ($result) {
 			return $this->processMessage($result);
